@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light Control</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh; /* Full viewport height */
+            margin: 0;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); /* Soft gradient background */
+            color: #333;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 40px 50px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Soft shadow */
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            border: 1px solid #e0e0e0;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 600;
+            letter-spacing: 1px;
+            position: relative;
+            padding-bottom: 10px;
+        }
+
+        h1::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            bottom: 0;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background-color: #007bff;
+            border-radius: 2px;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: center;
+            gap: 20px; /* Space between buttons */
+            margin-bottom: 30px;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        button:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5);
+        }
+
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ON button specific styling */
+        button[onclick*="ON"] {
+            background-color: #28a745; /* Green */
+            color: white;
+        }
+
+        button[onclick*="ON"]:hover {
+            background-color: #218838;
+        }
+
+        /* OFF button specific styling */
+        button[onclick*="OFF"] {
+            background-color: #dc3545; /* Red */
+            color: white;
+        }
+
+        button[onclick*="OFF"]:hover {
+            background-color: #c82333;
+        }
+
+        #status {
+            margin-top: 25px;
+            font-size: 1.1em;
+            color: #555;
+            padding: 10px 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            display: inline-block; /* To apply padding and border correctly */
+            min-width: 250px; /* Ensure a consistent width */
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Light Control</h1>
+    <div class="button-group">
+        <button onclick="sendCommand('ON')">Turn ON</button>
+        <button onclick="sendCommand('OFF')">Turn OFF</button>
+    </div>
+    <p id="status">Status: Waiting for command...</p>
+</div>
+
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<script>
+    // Connect to the MQTT broker using the specified WebSocket port
+    const client = mqtt.connect("ws://157.173.101.159:9001");
+
+    const statusElement = document.getElementById('status');
+
+    client.on('connect', () => {
+        console.log('Connected to MQTT broker');
+        statusElement.innerText = 'Status: Connected to broker. Ready.';
+        statusElement.style.backgroundColor = '#d4edda'; /* Light green for connected */
+        statusElement.style.borderColor = '#28a745'; /* Green border */
+        statusElement.style.color = '#155724'; /* Darker green text */
+    });
+
+    client.on('error', (err) => {
+        console.error('Connection error: ', err);
+        statusElement.innerText = `Status: Connection Error - ${err.message}`;
+        statusElement.style.backgroundColor = '#f8d7da'; /* Light red for error */
+        statusElement.style.borderColor = '#dc3545'; /* Red border */
+        statusElement.style.color = '#721c24'; /* Darker red text */
+    });
+
+    client.on('close', () => {
+        console.log('Disconnected from MQTT broker');
+        statusElement.innerText = 'Status: Disconnected from broker.';
+        statusElement.style.backgroundColor = '#fefefe'; /* White for disconnected */
+        statusElement.style.borderColor = '#6c757d'; /* Gray border */
+        statusElement.style.color = '#343a40'; /* Darker gray text */
+    });
+
+    client.on('offline', () => {
+        console.log('MQTT client is offline');
+        statusElement.innerText = 'Status: Offline (Attempting reconnect...)';
+        statusElement.style.backgroundColor = '#fff3cd'; /* Light yellow for offline */
+        statusElement.style.borderColor = '#ffc107'; /* Yellow border */
+        statusElement.style.color = '#856404'; /* Darker yellow text */
+    });
+
+    // Function to send ON/OFF commands
+    function sendCommand(command) {
+        const topic = '/mike/light_control';
+        client.publish(topic, command, {}, (err) => {
+            if (!err) {
+                statusElement.innerText = `Status: Command sent - ${command}`;
+                statusElement.style.backgroundColor = '#cfe2ff'; /* Light blue for command sent */
+                statusElement.style.borderColor = '#007bff'; /* Blue border */
+                statusElement.style.color = '#073660'; /* Darker blue text */
+            } else {
+                console.error('Publish error: ', err);
+                statusElement.innerText = `Status: Publish Error - ${err.message}`;
+                statusElement.style.backgroundColor = '#f8d7da'; /* Light red for error */
+                statusElement.style.borderColor = '#dc3545'; /* Red border */
+                statusElement.style.color = '#721c24'; /* Darker red text */
+            }
+        });
+    }
+</script>
+</body>
+</html>

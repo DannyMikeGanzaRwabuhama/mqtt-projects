@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sensor Data Monitor</title>
+  <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .container {
+      background-color: #ffffff;
+      padding: 30px 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 500px;
+      width: 100%;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 25px;
+      font-size: 2em;
+    }
+    .data-display {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+    .data-item {
+      background-color: #e9ecef;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-size: 1.2em;
+      color: #555;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .data-label {
+      font-weight: bold;
+      color: #007bff;
+    }
+    .data-value {
+      font-weight: normal;
+      color: #333;
+      min-width: 80px; /* Ensure space for values */
+      text-align: right;
+    }
+    .status-message {
+      margin-top: 20px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    .status-connected {
+      color: green;
+    }
+    .status-disconnected {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <h1>DHT11 Sensor Monitoring</h1>
+
+  <div class="data-display">
+    <div class="data-item">
+      <span class="data-label">Temperature:</span>
+      <span id="temperature" class="data-value">--.- °C</span>
+    </div>
+    <div class="data-item">
+      <span class="data-label">Humidity:</span>
+      <span id="humidity" class="data-value">--.- %</span>
+    </div>
+  </div>
+
+  <p class="status-message" id="mqttStatus">Connecting to MQTT...</p>
+</div>
+
+<script>
+  // MQTT Broker details
+  const BROKER_HOST = "157.173.101.159";
+  const WEBSOCKET_PORT = 9001;
+  const MQTT_TOPIC = "mike/sensor_data";
+
+  // DOM elements
+  const temperatureElement = document.getElementById('temperature');
+  const humidityElement = document.getElementById('humidity');
+  const mqttStatusElement = document.getElementById('mqttStatus');
+
+  // Connect to the MQTT broker via WebSocket
+  const client = mqtt.connect(`ws://${BROKER_HOST}:${WEBSOCKET_PORT}`);
+
+  client.on('connect', () => {
+    console.log('Connected to MQTT Broker via WebSocket');
+    mqttStatusElement.textContent = 'Status: Connected';
+    mqttStatusElement.classList.remove('status-disconnected');
+    mqttStatusElement.classList.add('status-connected');
+    client.subscribe(MQTT_TOPIC, (err) => {
+      if (!err) {
+        console.log(`Subscribed to topic: ${MQTT_TOPIC}`);
+      } else {
+        console.error(`Subscription error: ${err}`);
+      }
+    });
+  });
+
+  client.on('message', (topic, message) => {
+    // message is a Buffer, convert to string
+    const payload = message.toString();
+    console.log(`Received message on topic "${topic}": "${payload}"`);
+
+    // Parse the string "T:XX.XX,H:YY.YY"
+    const regex = /T:([\d.]+),H:([\d.]+)/;
+    const match = payload.match(regex);
+
+    if (match) {
+      const temperature = parseFloat(match[1]);
+      const humidity = parseFloat(match[2]);
+
+      if (!isNaN(temperature)) {
+        temperatureElement.textContent = `${temperature.toFixed(2)} °C`;
+      } else {
+        temperatureElement.textContent = `Error`;
+      }
+
+      if (!isNaN(humidity)) {
+        humidityElement.textContent = `${humidity.toFixed(2)} %`;
+      } else {
+        humidityElement.textContent = `Error`;
+      }
+    } else {
+      console.warn("Received data in unexpected format:", payload);
+      temperatureElement.textContent = `--.- °C`;
+      humidityElement.textContent = `--.- %`;
+    }
+  });
+
+  client.on('error', (err) => {
+    console.error('Connection error: ', err);
+    mqttStatusElement.textContent = `Status: Connection Error - ${err.message}`;
+    mqttStatusElement.classList.remove('status-connected');
+    mqttStatusElement.classList.add('status-disconnected');
+  });
+
+  client.on('close', () => {
+    console.log('Disconnected from MQTT Broker');
+    mqttStatusElement.textContent = 'Status: Disconnected';
+    mqttStatusElement.classList.remove('status-connected');
+    mqttStatusElement.classList.add('status-disconnected');
+  });
+
+  client.on('offline', () => {
+    console.log('MQTT client is offline');
+    mqttStatusElement.textContent = 'Status: Offline (Attempting reconnect...)';
+    mqttStatusElement.classList.remove('status-connected');
+    mqttStatusElement.classList.add('status-disconnected');
+  });
+
+</script>
+</body>
+</html>
